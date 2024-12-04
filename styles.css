@@ -1,0 +1,92 @@
+/* General Body Styling */
+body {
+    background: url('/static/blue-seamless.gif') no-repeat center center fixed; /* Correct local path */
+    background-size: cover;
+
+    font-family: 'Arial', sans-serif;
+    margin: 0;  /* Reset default margin */
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden; /* Prevent scrollbars */
+}
+
+/* Container Styling */
+.container {
+    background: rgba(255, 255, 255, 0.85); /* Semi-transparent white for better contrast */
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    backdrop-filter: blur(5px); /* Optional: Add a blur effect */
+}
+
+/* Header Styling */
+.container h1 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+/* Buttons Styling */
+.btn {
+    display: inline-block;
+    margin: 10px 5px;
+    padding: 12px 25px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+    background: #0056b3;
+}
+
+/* Text Area Styling */
+textarea {
+    width: 100%;
+    height: 70px;
+    margin: 15px 0;
+    padding: 12px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    resize: none;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Response Text Styling */
+#response-text {
+    margin: 15px 0;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    width: 100%;
+    font-size: 14px;
+    height: auto;
+    background-color: #f4f4f9;
+    color: #555;
+}
+
+/* Audio Player Styling */
+audio {
+    margin-top: 10px;
+    width: 100%;
+    border-radius: 10px;
+}
+
+/* Footer Styling */
+.footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}

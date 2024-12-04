@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpeechEase Voice Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SpeechEase Voice Assistant</h1>
+
+        <!-- Recording Button -->
+        <button class="btn" id="record-btn">Start Recording</button>
+
+        <!-- Process Audio Button -->
+        <button class="btn" id="process-btn">Process Audio</button>
+
+        <!-- Editable Transcription Area -->
+        <textarea id="transcription" placeholder="Transcription will appear here."></textarea>
+
+        <!-- Generate Response Button -->
+        <button class="btn" id="response-btn">Generate Response</button>
+
+        <!-- Display Response Text -->
+        <div id="response-text" placeholder="Response will appear here.">Response will appear here.</div>
+
+        <!-- Response Audio -->
+        <audio id="response-audio" controls style="display:none;"></audio>
+
+        <div class="footer">
+            Powered by SpeechEase
+        </div>
+    </div>
+
+    <script>
+        const recordBtn = document.getElementById("record-btn");
+        const processBtn = document.getElementById("process-btn");
+        const responseBtn = document.getElementById("response-btn");
+        const transcriptionTextarea = document.getElementById("transcription");
+        const responseTextDiv = document.getElementById("response-text");
+        const responseAudio = document.getElementById("response-audio");
+
+        let isRecording = false;
+
+        // Toggle Recording
+        recordBtn.addEventListener("click", () => {
+            fetch("/toggle_recording", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    isRecording = !isRecording;
+                    recordBtn.textContent = isRecording ? "Stop Recording" : "Start Recording";
+                })
+                .catch(error => console.error("Error toggling recording:", error));
+        });
+
+        // Process Audio
+        processBtn.addEventListener("click", () => {
+            fetch("/process_audio", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.transcription) {
+                        transcriptionTextarea.value = data.transcription;
+                    } else if (data.error) {
+                        transcriptionTextarea.value = data.error;
+                    }
+                })
+                .catch(error => console.error("Error processing audio:", error));
+        });
+
+        // Generate Response
+        responseBtn.addEventListener("click", () => {
+            const editedText = transcriptionTextarea.value;
+
+            fetch("/generate_response", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ transcription: editedText })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.response_text) {
+                        responseTextDiv.textContent = data.response_text;
+                        if (data.audio_file) {
+                            responseAudio.src = `/static/${data.audio_file}`;
+                            responseAudio.style.display = "block";
+                            responseAudio.play();
+                        }
+                    } else if (data.error) {
+                        responseTextDiv.textContent = data.error;
+                    }
+                })
+                .catch(error => console.error("Error generating response:", error));
+        });
+    </script>
+</body>
+</html>
