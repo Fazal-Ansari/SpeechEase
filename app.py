@@ -18,7 +18,7 @@ audio_frames = []
 transcription_result = ""
 
 # Groq API configuration
-groq_api_key = "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"
+groq_api_key = ""
 groq_model = "distil-whisper-large-v3-en"
 
 # Audio recording function
