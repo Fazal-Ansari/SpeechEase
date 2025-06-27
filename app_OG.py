@@ -5,10 +5,11 @@ import threading
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 import numpy as np
-import requests
-import re
-import os
+import speech_recognition as sr
 from gtts import gTTS
+import requests
+import re, os
+from groq import Groq
 
 app = Flask(__name__)
 
@@ -17,9 +18,10 @@ is_recording = False
 audio_frames = []
 transcription_result = ""
 
-# Groq API configuration
+# Groq API details
 groq_api_key = "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"
-groq_model = "distil-whisper-large-v3-en"
+groq_api_url = "https://api.groq.com/openai/v1/chat/completions"
+groq_model = "llama3-8b-8192"
 
 # Audio recording function
 def record_audio():
@@ -36,9 +38,7 @@ def record_audio():
     stream.close()
     p.terminate()
 
-    # Save recorded audio in 'static' folder
-    file_path = os.path.join('static', 'recorded_audio.wav')
-    wf = wave.open(file_path, "wb")
+    wf = wave.open("recorded_audio.wav", "wb")
     wf.setnchannels(1)
     wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
     wf.setframerate(16000)
@@ -55,18 +55,20 @@ def toggle_recording():
         threading.Thread(target=record_audio).start()
     return jsonify({"status": "recording" if is_recording else "stopped"})
 
+#@app.route('/process_audio', methods=['POST'])
 def clean_repetitions(text):
+    # Use regex to replace consecutive repeated words
     return re.sub(r'\b(\w+)\s+\1\b', r'\1', text)
-
+    
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
     global transcription_result
 
-    # Load and process audio from static folder
-    file_path = os.path.join('static', 'recorded_audio.wav')
-    audio = AudioSegment.from_wav(file_path)
-    silence_thresh = audio.dBFS - 14
-    chunks = split_on_silence(audio, min_silence_len=500, silence_thresh=silence_thresh)
+    audio = AudioSegment.from_wav("recorded_audio.wav")
+    silence_thresh = audio.dBFS - 14  # Dynamically adjust based on the average volume
+    chunks = split_on_silence(audio, min_silence_len=200, silence_thresh=silence_thresh)
+
+    #chunks = split_on_silence(audio, min_silence_len=200, silence_thresh=-35)
 
     def compare_chunks(chunk1, chunk2, threshold=0.8):
         arr1 = np.array(chunk1.get_array_of_samples())
@@ -93,30 +95,41 @@ def process_audio():
         output_audio += chunk
     output_audio += AudioSegment.silent(duration=500)
 
-    # Save processed audio in 'static' folder
-    processed_audio_path = os.path.join('static', 'processed_audio.wav')
-    output_audio.export(processed_audio_path, format="wav")
+    output_audio.export("processed_audio.wav", format="wav")
+    client = Groq(api_key="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")
+    filename = "processed_audio.wav"
+    try:
+        with open(filename, "rb") as file:
+        # Create a transcription of the audio file
+            transcription_result = client.audio.transcriptions.create(
+                file=(filename, file.read()),  # Required audio file
+                model="distil-whisper-large-v3-en",  # Required model to use for transcription
+                response_format="json",  # Optional
+                language="en",  # Optional
+                temperature=0.0  # Optional
+            )
+        # Clean up consecutive repeated words
+        transcription_result = clean_repetitions(transcription_result)
+        return jsonify({"transcription": transcription_result})
+    except sr.UnknownValueError:
+        return jsonify({"error": "Speech recognition could not understand the audio."})
+    except sr.RequestError as e:
+        return jsonify({"error": f"Could not request results from the service; {e}"})
 
-    # Use Groq API for transcription
-    with open(processed_audio_path, "rb") as file:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {groq_api_key}"},
-            files={"file": file},
-            data={
-                "model": groq_model,
-                "response_format": "json",
-                "language": "en",
-                "temperature": "0.0"
-            }
-        )
-        if response.status_code == 200:
-            transcription_data = response.json()
-            transcription_result = transcription_data.get("text", "")
+
+''' recognizer = sr.Recognizer()
+    recognizer.pause_threshold = 1.0
+    with sr.AudioFile("processed_audio.wav") as source:
+        audio_data = recognizer.record(source)
+        try:
+            transcription_result = recognizer.recognize_google(audio_data)
+            # Clean up consecutive repeated words
             transcription_result = clean_repetitions(transcription_result)
             return jsonify({"transcription": transcription_result})
-        else:
-            return jsonify({"error": f"Groq API error: {response.status_code}, {response.text}"})
+        except sr.UnknownValueError:
+            return jsonify({"error": "Speech recognition could not understand the audio."})
+        except sr.RequestError as e:
+            return jsonify({"error": f"Could not request results from the service; {e}"})'''
 
 
 @app.route('/generate_response', methods=['POST'])
@@ -129,7 +142,7 @@ def generate_response():
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama3-8b-8192",  # Chat completion-specific model
+        "model": groq_model,
         "messages": [
             {
                 "role": "system",
@@ -142,26 +155,26 @@ def generate_response():
         ]
     }
 
-    # Call Groq API for chat completion
-    response = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+    response = requests.post(groq_api_url, json=payload, headers=headers)
     if response.status_code == 200:
         groq_response = response.json()
         response_text = groq_response['choices'][0]['message']['content']
 
-        # Convert text response to speech using gTTS
         tts = gTTS(text=response_text, lang='en')
-        audio_file_path = os.path.join('static', 'response_audio.mp3')  # Save in 'static' folder
-        tts.save(audio_file_path)
-
-        # Return response JSON with path to the saved audio file
+        tts.save("response_audio.mp3")
         return jsonify({"response_text": response_text, "audio_file": "response_audio.mp3"})
     else:
         return jsonify({"error": f"API error: {response.status_code}, {response.text}"})
 
 
+@app.route('/audio/<filename>')
+def serve_audio(filename):
+    return send_file(filename, as_attachment=True)
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html')  # HTML template for basic UI
 
 if __name__ == '__main__':
     app.run(debug=True)
+
